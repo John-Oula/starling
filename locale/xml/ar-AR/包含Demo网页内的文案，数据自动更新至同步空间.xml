@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<resources>
+    <string name="single">source/target text</string>
+    <plurals name="plural">
+        <item quantity="one">one</item>
+        <item quantity="other">other</item>
+    </plurals>
+</resources>
