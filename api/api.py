@@ -3,11 +3,11 @@ import os
 import requests
 from flask import Flask, request, url_for, redirect, jsonify
 from requests.auth import HTTPBasicAuth
-from starling import AuthHeader
+
 
 app = Flask(__name__)
 
-PAT = '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'
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
@@ -45,7 +45,11 @@ def push():
     # Directory path
     dir_path = os.path.join(app.root_path +'/projects/repos')
 
-    os.mkdir(os.path.join(dir_path, repo))
+    try:
+        os.mkdir(os.path.join(dir_path, repo))
+    except:
+        pass
+
 
 
     # Fetch file(s) download url from github REST API
@@ -64,32 +68,33 @@ def push():
         f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'wb')
         f.write(res.content)
         f.close()
+        print(file['download_url'])
 
 
 
 
     return '' , 200
 
-@app.route("/auth",methods=['POST','GET'])
-def auth():
-
-    canonical_headers = AuthHeader().canonical_headers(host=host)
-    canonical_request = AuthHeader().canonical_request(method='POST',body=body,canonical_uri=canonical_uri,canonical_querystring=canonical_querystring,signed_headers=signed_headers,host=host)
-    string_to_sign = AuthHeader().string_to_sign(algorithm=algorithm,region=region,service=service)
-    signature =  AuthHeader().signature(secret_key=secret_key,region=region,service=service)
-    auth_header= AuthHeader().generate_auth_header(access_key=access_key,signed_headers=signed_headers,signature=signature)
-    print(auth_header)
-
-    headers = {
-            "content-type": 'application/json',
-            'x-date': AuthHeader().date(),
-            'Authorization': auth_header
-        }
-    request_url = endpoint + '?' + canonical_querystring
-
-    r = requests.post(request_url, headers=auth_header , data=body)
-    print(r.json())
-    return '' , 200
+# @app.route("/auth",methods=['POST','GET'])
+# def auth():
+#
+#     canonical_headers = AuthHeader().canonical_headers(host=host)
+#     canonical_request = AuthHeader().canonical_request(method='POST',body=body,canonical_uri=canonical_uri,canonical_querystring=canonical_querystring,signed_headers=signed_headers,host=host)
+#     string_to_sign = AuthHeader().string_to_sign(algorithm=algorithm,region=region,service=service)
+#     signature =  AuthHeader().signature(secret_key=secret_key,region=region,service=service)
+#     auth_header= AuthHeader().generate_auth_header(access_key=access_key,signed_headers=signed_headers,signature=signature)
+#     print(auth_header)
+#
+#     headers = {
+#             "content-type": 'application/json',
+#             'x-date': AuthHeader().date(),
+#             'Authorization': auth_header
+#         }
+#     request_url = endpoint + '?' + canonical_querystring
+#
+#     r = requests.post(request_url, headers=auth_header , data=body)
+#     print(r.json())
+#     return '' , 200
 
 @app.route("/send_file",methods=['POST','GET'])
 def send_file():
