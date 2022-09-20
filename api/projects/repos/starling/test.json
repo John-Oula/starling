@@ -1,0 +1,7 @@
+{
+    "single": {
+        "source": "source/target text",
+        "lengthLimit": 10,
+        "context": "qqq"
+    }
+}
