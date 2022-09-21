@@ -1,22 +1,27 @@
+import base64
+import datetime
+import hashlib
+import hmac
+import json
 import os
 
 import requests
 from flask import Flask, request, url_for, redirect, jsonify
 from requests.auth import HTTPBasicAuth
 
-
 app = Flask(__name__)
 
-PAT = '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'
+
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
 host = "open.volcengineapi.com"
 region = 'cn-beijing'
 endpoint = "https://open.volcengineapi.com"
-request_parameters = 'Action=ProjectTaskTextImport&Version=2021-05-21'
+request_parameters = 'Action=ProjectTaskSourceAdd&Version=2021-05-21'
 content_type = 'application/json'
-body = '{"projectId":"4894","taskId":"94830089"}'
+
 access_key = "AKLTMDc3MGY5ZmI4NDI4NDRjZmE0ZjkyMDhjZDQ0YzI0Yzg"
 secret_key = "T0RReE1EQXlZMk0wWVdNMU5ETTBZVGhsTkdFd00yVmxPVGRsWkdRMll6VQ=="
 signed_headers = 'host;x-date'
@@ -24,13 +29,39 @@ canonical_uri = '/'
 canonical_querystring = request_parameters
 algorithm = 'HMAC-SHA256'
 
+
+def sign(key, msg):
+    return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+
+def getSignatureKey(key, dateStamp, regionName, serviceName):
+    kDate = sign((key).encode('utf-8'), dateStamp)
+    kRegion = sign(kDate, regionName)
+    kService = sign(kRegion, serviceName)
+    kSigning = sign(kService, 'request')
+    return kSigning
+def date():
+    # Create a date for headers and the credential string
+    t = datetime.datetime.utcnow()
+    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
+    return datestamp
+
+
+def datestamp():
+    # Create a date for headers and the credential string
+    t = datetime.datetime.utcnow()
+    date = t.strftime('%Y%m%dT%H%M%SZ')
+    return date
+
+
 # Receive push webhook notifications
 # create project and task
 @app.route("/push",methods=['POST','GET'])
 def push():
 
     response = request.get_json()
-    download_url_list = []
+    content_list_b64 = []
+    print(response)
 
     # Get the commits according to commit type
 
@@ -52,49 +83,157 @@ def push():
 
 
 
-    # Fetch file(s) download url from github REST API
+    # Fetch file(s) base64 content from github REST API
     # Using the list of file paths stored in the above variables
     for path in changed_files:
         res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner,repo,path),  auth = HTTPBasicAuth(username, PAT))
-        download_url_list.append(res.json())
+        content_list_b64.append(res.json())
         print(res.json())
+        print(content_list_b64)
 
-    # From the download_url_list
+    # From the content_list_b64
     # Fetch and Download the files
     # Save downloaded files
-    for file in download_url_list:
-        res = requests.get(file['download_url'])
-        open(file['name'], "wb").write(res.content)
-        f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'wb')
-        f.write(res.content)
-        f.close()
-        print(file['download_url'])
+    texts = []
+    for file in content_list_b64:
+        file_content = base64.b64decode(file["content"])
+        f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'w')
+        f.write(file_content.decode('utf-8'))
 
+        f.close()
+
+        # Convert bytes to string
+        # Convert JSON file to Dict
+        # Add to list
+        file_to_string = file_content.decode('utf-8')
+        to_dict = json.loads(file_to_string)
+        texts.append(to_dict)
+
+        # Replace file's keys with "key" key
+        # Replace file's key's value with "content" key
+
+
+    ##### AUTH #####
+
+
+
+    body = {"projectId": 4894, "taskId": "94830089" ,"texts":texts}
+    t = datetime.datetime.utcnow()
+    date = t.strftime('%Y%m%dT%H%M%SZ')
+    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
+
+    canonical_uri = '/'
+
+
+    canonical_querystring = request_parameters
+
+
+    canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
+
+    signed_headers = 'host;x-date'
+
+
+
+    payload_hash = hashlib.sha256(json.dumps(body).encode('utf-8')).hexdigest()
+
+    canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
+
+
+    algorithm = 'HMAC-SHA256'
+    credential_scope = datestamp + '/' + region + '/' + service + '/' + 'request'
+    string_to_sign = algorithm + '\n' + date + '\n' + credential_scope + '\n' + hashlib.sha256(
+        canonical_request.encode('utf-8')).hexdigest()
+
+    # ************* TASK 3: CALCULATE THE SIGNATURE *************
+
+    signing_key = getSignatureKey(secret_key, datestamp, region, service)
+
+    # Sign the string_to_sign using the signing_key
+    signature = hmac.new(signing_key, (string_to_sign).encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST *************
+
+    authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
+
+
+    headers = {
+        "content-type": 'application/json',
+        'x-date': date,
+        'Authorization': authorization_header}
+
+    # ************* SEND THE REQUEST *************
+    request_url = endpoint + '?' + canonical_querystring
+
+
+    r = requests.post(request_url, headers=headers, data=json.dumps(body))
+
+    print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
+    print( r.status_code)
+    print(r.text)
+    print(r.request.body)
 
 
 
     return '' , 200
 
-# @app.route("/auth",methods=['POST','GET'])
-# def auth():
-#
-#     canonical_headers = AuthHeader().canonical_headers(host=host)
-#     canonical_request = AuthHeader().canonical_request(method='POST',body=body,canonical_uri=canonical_uri,canonical_querystring=canonical_querystring,signed_headers=signed_headers,host=host)
-#     string_to_sign = AuthHeader().string_to_sign(algorithm=algorithm,region=region,service=service)
-#     signature =  AuthHeader().signature(secret_key=secret_key,region=region,service=service)
-#     auth_header= AuthHeader().generate_auth_header(access_key=access_key,signed_headers=signed_headers,signature=signature)
-#     print(auth_header)
-#
-#     headers = {
-#             "content-type": 'application/json',
-#             'x-date': AuthHeader().date(),
-#             'Authorization': auth_header
-#         }
-#     request_url = endpoint + '?' + canonical_querystring
-#
-#     r = requests.post(request_url, headers=auth_header , data=body)
-#     print(r.json())
-#     return '' , 200
+@app.route("/auth",methods=['POST','GET'])
+def auth():
+    texts = []
+    body = {"projectId": 4894, "taskId": "94830089" ,"texts":texts}
+    t = datetime.datetime.utcnow()
+    date = t.strftime('%Y%m%dT%H%M%SZ')
+    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
+
+    canonical_uri = '/'
+
+
+    canonical_querystring = request_parameters
+
+
+    canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
+
+    signed_headers = 'host;x-date'
+
+
+
+    payload_hash = hashlib.sha256(json.dumps(body).encode('utf-8')).hexdigest()
+
+    canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
+
+
+    algorithm = 'HMAC-SHA256'
+    credential_scope = datestamp + '/' + region + '/' + service + '/' + 'request'
+    string_to_sign = algorithm + '\n' + date + '\n' + credential_scope + '\n' + hashlib.sha256(
+        canonical_request.encode('utf-8')).hexdigest()
+
+    # ************* TASK 3: CALCULATE THE SIGNATURE *************
+
+    signing_key = getSignatureKey(secret_key, datestamp, region, service)
+
+    # Sign the string_to_sign using the signing_key
+    signature = hmac.new(signing_key, (string_to_sign).encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST *************
+
+    authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
+
+
+    headers = {
+        "content-type": 'application/json',
+        'x-date': date,
+        'Authorization': authorization_header}
+
+    # ************* SEND THE REQUEST *************
+    request_url = endpoint + '?' + canonical_querystring
+
+
+    r = requests.post(request_url, headers=headers, data=json.dumps(body))
+
+    print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
+    print( r.status_code)
+    print(r.text)
+    print(r.request.body)
+    return '' , 200
 
 @app.route("/send_file",methods=['POST','GET'])
 def send_file():

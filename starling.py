@@ -16,9 +16,19 @@ service = 'i18n_openapi'
 host = "open.volcengineapi.com"
 region = 'cn-beijing'
 endpoint = "https://open.volcengineapi.com"
-request_parameters = 'Action=ProjectTaskTextImport&Version=2021-05-21'
+request_parameters = 'Action=ProjectTaskSourceAdd&Version=2021-05-21'
 content_type = 'application/json'
-body = {"projectId":4894,"taskId":"94830089","autoSync":1,"file":files}
+texts = [{
+    "key": "homepage.services.service_title_1",
+    "content": "Test API"
+},
+
+{
+    "key": "homepage.services.service_title_2",
+    "content": "Test API 2"
+}
+]
+body = {"projectId": 4894, "taskId": "94830089" ,"texts":texts}
 def sign(key, msg):
     return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
 
