@@ -12,7 +12,7 @@ from requests.auth import HTTPBasicAuth
 app = Flask(__name__)
 
 
-PAT = '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'
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
@@ -61,20 +61,23 @@ def push():
 
     response = request.get_json()
     content_list_b64 = []
-    print(response)
+
 
     # Get the commits according to commit type
 
+    try:
+        added_files = response['head_commit']['added']
+        changed_files = response['head_commit']['modified']
+        removed_files = response['head_commit']['removed']
 
-    added_files = response['head_commit']['added']
-    changed_files = response['head_commit']['modified']
-    removed_files = response['head_commit']['removed']
+        owner = response['repository']['owner']['name']
+        repo = response['repository']['name']
 
-    owner = response['repository']['owner']['name']
-    repo = response['repository']['name']
+        # Directory path
+        dir_path = os.path.join(app.root_path + '/projects/repos')
 
-    # Directory path
-    dir_path = os.path.join(app.root_path +'/projects/repos')
+    except:
+        pass
 
     try:
         os.mkdir(os.path.join(dir_path, repo))
@@ -89,12 +92,13 @@ def push():
         res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner,repo,path),  auth = HTTPBasicAuth(username, PAT))
         content_list_b64.append(res.json())
         print(res.json())
-        print(content_list_b64)
+
 
     # From the content_list_b64
     # Fetch and Download the files
     # Save downloaded files
     texts = []
+    request_texts = []
     for file in content_list_b64:
         file_content = base64.b64decode(file["content"])
         f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'w')
@@ -109,15 +113,25 @@ def push():
         to_dict = json.loads(file_to_string)
         texts.append(to_dict)
 
+
+
         # Replace file's keys with "key" key
         # Replace file's key's value with "content" key
+
+
+    for i, j in texts[0].items():
+        new_obj = {}
+        new_obj["key"] = i
+        new_obj["content"] = j
+
+        request_texts.append(new_obj)
 
 
     ##### AUTH #####
 
 
 
-    body = {"projectId": 4894, "taskId": "94830089" ,"texts":texts}
+    body = {"projectId": 4883, "taskId": "24279681" ,"texts":request_texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope

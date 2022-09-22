@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <key>plural</key>
+    <key>demopage_customers_languages</key>
     <dict>
       <key>NSStringLocalizedFormatKey</key>
       <string>%#@format_key@</string>
@@ -11,9 +11,51 @@
         <key>NSStringFormatSpecTypeKey</key>
         <string>NSStringPluralRuleType</string>
         <key>one</key>
-        <string>one</string>
+        <string>{count_languages} target language</string>
         <key>other</key>
-        <string>other</string>
+        <string>{count_languages} target languages</string>
+      </dict>
+    </dict>
+    <key>demopage_customers_projects</key>
+    <dict>
+      <key>NSStringLocalizedFormatKey</key>
+      <string>%#@format_key@</string>
+      <key>format_key</key>
+      <dict>
+        <key>NSStringFormatSpecTypeKey</key>
+        <string>NSStringPluralRuleType</string>
+        <key>one</key>
+        <string>{count_projects} i18n project</string>
+        <key>other</key>
+        <string>{count_projects} i18n projects</string>
+      </dict>
+    </dict>
+    <key>demopage_customers_users</key>
+    <dict>
+      <key>NSStringLocalizedFormatKey</key>
+      <string>%#@format_key@</string>
+      <key>format_key</key>
+      <dict>
+        <key>NSStringFormatSpecTypeKey</key>
+        <string>NSStringPluralRuleType</string>
+        <key>one</key>
+        <string>{count_users} registered user</string>
+        <key>other</key>
+        <string>{count_users} registered users</string>
+      </dict>
+    </dict>
+    <key>demopage_header_free_trial</key>
+    <dict>
+      <key>NSStringLocalizedFormatKey</key>
+      <string>%#@format_key@</string>
+      <key>format_key</key>
+      <dict>
+        <key>NSStringFormatSpecTypeKey</key>
+        <string>NSStringPluralRuleType</string>
+        <key>one</key>
+        <string>Try all features free for {free_trial_days} day</string>
+        <key>other</key>
+        <string>Try all features free for {free_trial_days} days</string>
       </dict>
     </dict>
   </dict>
