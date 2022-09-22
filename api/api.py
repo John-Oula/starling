@@ -28,7 +28,7 @@ signed_headers = 'host;x-date'
 canonical_uri = '/'
 canonical_querystring = request_parameters
 algorithm = 'HMAC-SHA256'
-NSPACE_ID = '39785'
+NSPACE_ID = '39880'
 OP_ID = 2100225925
 
 
@@ -58,14 +58,20 @@ def datestamp():
 
 # Receive push webhook notifications
 # create project and task
+
+
+# This endpoint listen to webhook notifications
+# from Github when files are pushed to the  repository
+
 @app.route("/push",methods=['POST','GET'])
 def push():
 
     response = request.get_json()
     content_list_b64 = []
+    texts = [] #
+    request_texts = [] #
 
-
-    # Get the commits according to commit type
+    # Get the commited file paths according to commit type
 
     try:
         added_files = response['head_commit']['added']
@@ -75,12 +81,16 @@ def push():
         owner = response['repository']['owner']['name']
         repo = response['repository']['name']
 
-        # Directory path
-        dir_path = os.path.join(app.root_path + '/projects/repos')
+
 
     except:
         pass
 
+
+        # Directory path
+        dir_path = os.path.join(app.root_path + '/projects/repos')
+
+        # Make a directory using the repository name
     try:
         os.mkdir(os.path.join(dir_path, repo))
     except:
@@ -88,19 +98,15 @@ def push():
 
 
 
-    # Fetch file(s) base64 content from github REST API
-    # Using the list of file paths stored in the above variables
+    # Fetch base64 encoded files from github REST API
+    # Using the list of file paths in changed_files
     for path in changed_files:
         res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner,repo,path),  auth = HTTPBasicAuth(username, PAT))
         content_list_b64.append(res.json())
-        print(res.json())
 
 
-    # From the content_list_b64
-    # Fetch and Download the files
-    # Save downloaded files
-    texts = []
-    request_texts = []
+
+
     for file in content_list_b64:
         file_content = base64.b64decode(file["content"])
         f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'w')
@@ -133,7 +139,7 @@ def push():
 
 
 
-    body = {"projectId": 4883, "taskId": "24279681" ,"texts":request_texts}
+    body = {"projectId": 4883, "taskId": "16932566" ,"texts":request_texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
@@ -181,7 +187,7 @@ def push():
     request_url = endpoint + '?' + canonical_querystring
 
 
-    r = requests.post(request_url, headers=headers, data=json.dumps(body))
+    r = requests.post(request_url, headers=headers, data=json.dumps(body).encode('utf-8').decode())
 
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
     print( r.status_code)
@@ -251,8 +257,8 @@ def auth():
     print(r.request.body)
     return '' , 200
 
-@app.route("/publish/<key>",methods=['POST','GET'])
-def publish(key):
+@app.route("/publish",methods=['POST','GET'])
+def publish():
 
     # response_data = request.data
     #
@@ -263,37 +269,56 @@ def publish(key):
     #
     # projectId = json_response["projectId"]
     args = request.args.to_dict()
-    print(args)
     projectId = 4883
+    token_url = 'https://starling-public.zijieapi.com/v3/get_auth_token/%s/%s/%s/%s/' % (
+    args['key'], OP_ID, projectId, NSPACE_ID)
 
-    try:
-        token_url = 'https://starling-public.zijieapi.com/v3/get_auth_token/%s/%s/%s/%s/' % (
-        key, OP_ID, projectId, NSPACE_ID)
+    res = requests.post(token_url)
+    token = res.json()['data']['token']
 
-        res = requests.post(token_url)
-        token = res.json()['data']['token']
+    headers = {
+        'Authorization': token
+    }
+    # Fetch and download resource files
+    locale = 'zh-CN'
 
-        headers = {
-            'Authorization': token
-        }
-        # Fetch and download resource files
-        locale = 'en-US'
+    copy_url = 'https://starling-public.zijieapi.com/text_test2/%s/%s' % (NSPACE_ID, locale)
+    pull_copy = requests.get(copy_url, headers=headers)
+    contents = pull_copy.json()['message']['data']
+    # Base64 encode the contents
+    # PUT contents back to the repository
+    # Merge contents
+    b64_contents = base64.b64encode(json.dumps(contents ,ensure_ascii=False).encode('utf-8')).decode()
+    print(contents)
 
-        copy_url = 'https://starling-public.zijieapi.com/text_test2/%s/%s' % (NSPACE_ID, locale)
-        pull_copy = requests.get(copy_url, headers=headers)
-        contents = pull_copy.json()['message']['data']
-        print(pull_copy.json())
-        # Base64 encode the contents
-        # PUT contents back to the repository
-        # Merge contents
-        b64_contents = base64.b64encode(contents)
+    repo_url = args['repo_url']
+    # Get file sha prop for the updated file
+    # Generate parameters from the repo_url
+    req_sha = requests.get(repo_url ,auth=HTTPBasicAuth(username, PAT))
+    owner = repo_url.split('/')[4]
+    repo = repo_url.split('/')[5]
+    path_list = repo_url.split('/')[7:]
+    path = ""
 
-        res = requests.put('https://api.github.com/repos/%s/%s/contents/%s' % (owner, repo, path),
-                           auth=HTTPBasicAuth(username, PAT))
+    for i in path_list:
+        i = '/' + i
+        path += i
 
-        print(res.json())
-    except:
-        pass
+    data = {
+        "owner": owner,
+        "sha": req_sha.json()['sha'],
+        "repo": repo,
+        "path":path,
+        "message": "%s translations" % locale,
+        "content": b64_contents
+
+    }
+    print(data['path'])
+
+    res = requests.put(repo_url, auth=HTTPBasicAuth(username, PAT), data=json.dumps(data))
+
+    print(res.json())
+
     return '',200
 
 
