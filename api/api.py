@@ -12,7 +12,7 @@ from requests.auth import HTTPBasicAuth
 app = Flask(__name__)
 
 
-PAT = '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'
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
@@ -28,6 +28,8 @@ signed_headers = 'host;x-date'
 canonical_uri = '/'
 canonical_querystring = request_parameters
 algorithm = 'HMAC-SHA256'
+NSPACE_ID = '39785'
+OP_ID = 2100225925
 
 
 def sign(key, msg):
@@ -249,15 +251,52 @@ def auth():
     print(r.request.body)
     return '' , 200
 
-@app.route("/send_file",methods=['POST','GET'])
-def send_file():
+@app.route("/publish/<key>",methods=['POST','GET'])
+def publish(key):
 
-    file_path = os.path.abspath('test.json')
-    f = open(file_path, 'wb')
+    # response_data = request.data
+    #
+    # response = response_data.decode('utf-8')
+    #
+    # json_response = json.loads(response)
+    #
+    #
+    # projectId = json_response["projectId"]
+    args = request.args.to_dict()
+    print(args)
+    projectId = 4883
 
-    resp = requests.post(endpoint+'?'+request_parameters,data=body)
+    try:
+        token_url = 'https://starling-public.zijieapi.com/v3/get_auth_token/%s/%s/%s/%s/' % (
+        key, OP_ID, projectId, NSPACE_ID)
 
-    return '' , 200
+        res = requests.post(token_url)
+        token = res.json()['data']['token']
+
+        headers = {
+            'Authorization': token
+        }
+        # Fetch and download resource files
+        locale = 'en-US'
+
+        copy_url = 'https://starling-public.zijieapi.com/text_test2/%s/%s' % (NSPACE_ID, locale)
+        pull_copy = requests.get(copy_url, headers=headers)
+        contents = pull_copy.json()['message']['data']
+        print(pull_copy.json())
+        # Base64 encode the contents
+        # PUT contents back to the repository
+        # Merge contents
+        b64_contents = base64.b64encode(contents)
+
+        res = requests.put('https://api.github.com/repos/%s/%s/contents/%s' % (owner, repo, path),
+                           auth=HTTPBasicAuth(username, PAT))
+
+        print(res.json())
+    except:
+        pass
+    return '',200
+
+
 
 if __name__ == '__main__':
 
