@@ -11,7 +11,6 @@ from requests.auth import HTTPBasicAuth
 
 app = Flask(__name__)
 
-
 PAT = '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'
 username = 'John-Oula'
 method = 'POST'
@@ -42,6 +41,8 @@ def getSignatureKey(key, dateStamp, regionName, serviceName):
     kService = sign(kRegion, serviceName)
     kSigning = sign(kService, 'request')
     return kSigning
+
+
 def date():
     # Create a date for headers and the credential string
     t = datetime.datetime.utcnow()
@@ -63,13 +64,12 @@ def datestamp():
 # This endpoint listen to webhook notifications
 # from Github when files are pushed to the  repository
 
-@app.route("/push",methods=['POST','GET'])
+@app.route("/push", methods=['POST', 'GET'])
 def push():
-
     response = request.get_json()
     content_list_b64 = []
-    texts = [] #
-    request_texts = [] #
+    texts = []  #
+    request_texts = []  #
 
     # Get the commited file paths according to commit type
 
@@ -86,7 +86,6 @@ def push():
     except:
         pass
 
-
         # Directory path
         dir_path = os.path.join(app.root_path + '/projects/repos')
 
@@ -96,20 +95,17 @@ def push():
     except:
         pass
 
-
-
-    # Fetch base64 encoded files from github REST API
+    # Fetch base64 encoded files from GitHub REST API
     # Using the list of file paths in changed_files
+    # Append each json object to  content_list_b64
     for path in changed_files:
-        res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner,repo,path),  auth = HTTPBasicAuth(username, PAT))
+        res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner, repo, path),
+                           auth=HTTPBasicAuth(username, PAT))
         content_list_b64.append(res.json())
-
-
-
 
     for file in content_list_b64:
         file_content = base64.b64decode(file["content"])
-        f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']),'w')
+        f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']), 'w')
         f.write(file_content.decode('utf-8'))
 
         f.close()
@@ -121,11 +117,8 @@ def push():
         to_dict = json.loads(file_to_string)
         texts.append(to_dict)
 
-
-
         # Replace file's keys with "key" key
         # Replace file's key's value with "content" key
-
 
     for i, j in texts[0].items():
         new_obj = {}
@@ -134,32 +127,24 @@ def push():
 
         request_texts.append(new_obj)
 
-
     ##### AUTH #####
 
-
-
-    body = {"projectId": 4883, "taskId": "16932566" ,"texts":request_texts}
+    body = {"projectId": 4883, "taskId": "16932566", "texts": request_texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
 
     canonical_uri = '/'
 
-
     canonical_querystring = request_parameters
-
 
     canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
 
     signed_headers = 'host;x-date'
 
-
-
     payload_hash = hashlib.sha256(json.dumps(body).encode('utf-8')).hexdigest()
 
     canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
-
 
     algorithm = 'HMAC-SHA256'
     credential_scope = datestamp + '/' + region + '/' + service + '/' + 'request'
@@ -177,7 +162,6 @@ def push():
 
     authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
 
-
     headers = {
         "content-type": 'application/json',
         'x-date': date,
@@ -185,43 +169,36 @@ def push():
 
     # ************* SEND THE REQUEST *************
     request_url = endpoint + '?' + canonical_querystring
-
 
     r = requests.post(request_url, headers=headers, data=json.dumps(body).encode('utf-8').decode())
 
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
-    print( r.status_code)
+    print(r.status_code)
     print(r.text)
     print(r.request.body)
 
+    return '', 200
 
 
-    return '' , 200
-
-@app.route("/auth",methods=['POST','GET'])
+@app.route("/auth", methods=['POST', 'GET'])
 def auth():
     texts = []
-    body = {"projectId": 4894, "taskId": "94830089" ,"texts":texts}
+    body = {"projectId": 4894, "taskId": "94830089", "texts": texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
 
     canonical_uri = '/'
 
-
     canonical_querystring = request_parameters
-
 
     canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
 
     signed_headers = 'host;x-date'
 
-
-
     payload_hash = hashlib.sha256(json.dumps(body).encode('utf-8')).hexdigest()
 
     canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
-
 
     algorithm = 'HMAC-SHA256'
     credential_scope = datestamp + '/' + region + '/' + service + '/' + 'request'
@@ -239,7 +216,6 @@ def auth():
 
     authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
 
-
     headers = {
         "content-type": 'application/json',
         'x-date': date,
@@ -248,18 +224,17 @@ def auth():
     # ************* SEND THE REQUEST *************
     request_url = endpoint + '?' + canonical_querystring
 
-
     r = requests.post(request_url, headers=headers, data=json.dumps(body))
 
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
-    print( r.status_code)
+    print(r.status_code)
     print(r.text)
     print(r.request.body)
-    return '' , 200
+    return '', 200
 
-@app.route("/publish",methods=['POST','GET'])
+
+@app.route("/publish", methods=['POST', 'GET'])
 def publish():
-
     # response_data = request.data
     #
     # response = response_data.decode('utf-8')
@@ -271,7 +246,7 @@ def publish():
     args = request.args.to_dict()
     projectId = 4883
     token_url = 'https://starling-public.zijieapi.com/v3/get_auth_token/%s/%s/%s/%s/' % (
-    args['key'], OP_ID, projectId, NSPACE_ID)
+        args['key'], OP_ID, projectId, NSPACE_ID)
 
     res = requests.post(token_url)
     token = res.json()['data']['token']
@@ -288,13 +263,13 @@ def publish():
     # Base64 encode the contents
     # PUT contents back to the repository
     # Merge contents
-    b64_contents = base64.b64encode(json.dumps(contents ,ensure_ascii=False).encode('utf-8')).decode()
+    b64_contents = base64.b64encode(json.dumps(contents, ensure_ascii=False).encode('utf-8')).decode()
     print(contents)
 
     repo_url = args['repo_url']
     # Get file sha prop for the updated file
     # Generate parameters from the repo_url
-    req_sha = requests.get(repo_url ,auth=HTTPBasicAuth(username, PAT))
+    req_sha = requests.get(repo_url, auth=HTTPBasicAuth(username, PAT))
     owner = repo_url.split('/')[4]
     repo = repo_url.split('/')[5]
     path_list = repo_url.split('/')[7:]
@@ -308,7 +283,7 @@ def publish():
         "owner": owner,
         "sha": req_sha.json()['sha'],
         "repo": repo,
-        "path":path,
+        "path": path,
         "message": "%s translations" % locale,
         "content": b64_contents
 
@@ -319,10 +294,8 @@ def publish():
 
     print(res.json())
 
-    return '',200
-
+    return '', 200
 
 
 if __name__ == '__main__':
-
     app.run()
