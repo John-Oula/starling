@@ -4,21 +4,22 @@ import hashlib
 import hmac
 import json
 import os
-from aws import  VolcAuth
+from aws import VolcAuth
 import requests
 from flask import Flask, request, url_for, redirect, jsonify
 from requests.auth import HTTPBasicAuth
+from github import Github, GithubIntegration
 
 app = Flask(__name__)
 
-PAT = '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'
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
 host = "open.volcengineapi.com"
 region = 'cn-beijing'
 endpoint = "https://open.volcengineapi.com"
-request_parameters = 'Action=ProjectNamespaceSourceAdd&Version=2021-05-21'
+request_parameters = 'Action=ProjectTaskSourceAdd&Version=2021-05-21'
 content_type = 'application/json'
 
 access_key = "AKLTMDc3MGY5ZmI4NDI4NDRjZmE0ZjkyMDhjZDQ0YzI0Yzg"
@@ -30,7 +31,17 @@ algorithm = 'HMAC-SHA256'
 NSPACE_ID = '39880'
 OP_ID = 2100225925
 
-volc_auth = VolcAuth(access_key=access_key,secret_access_key=secret_key,region=region,service=service,host=host)
+app_id = 239753
+# Read the  certificate
+with open(os.path.normpath(os.path.expanduser('../certs/github/private_key.pem')),'r') as cert_file:
+    app_key = cert_file.read()
+
+# Create an GitHub integration instance
+git_integration = GithubIntegration(app_id,app_key)
+
+# volc_auth = VolcAuth(access_key=access_key, secret_access_key=secret_key, region=region, service=service, host=host)
+
+
 def sign(key, msg):
     return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
 
@@ -42,16 +53,12 @@ def getSignatureKey(key, dateStamp, regionName, serviceName):
     kSigning = sign(kService, 'request')
     return kSigning
 
-def generate_auth_headers(method, canonical_querystring, body, canonical_uri, secret_key ,region, service ,access_key,host):
 
-
+def generate_auth_headers(method, canonical_querystring, body, canonical_uri, secret_key, region, service, access_key,
+                          host):
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
-
-
-
-
 
     canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
 
@@ -84,6 +91,7 @@ def generate_auth_headers(method, canonical_querystring, body, canonical_uri, se
     }
     return headers
 
+
 def date():
     # Create a date for headers and the credential string
     t = datetime.datetime.utcnow()
@@ -113,7 +121,8 @@ def push():
     request_texts = []  #
 
     # Get the committed file paths according to commit type
-
+    # Directory path
+    dir_path = os.path.join(app.root_path + '/projects/repos')
     try:
         added_files = response['head_commit']['added']
         changed_files = response['head_commit']['modified']
@@ -127,8 +136,7 @@ def push():
     except:
         pass
 
-        # Directory path
-        dir_path = os.path.join(app.root_path + '/projects/repos')
+
 
         # Make a directory using the repository name
     try:
@@ -139,6 +147,7 @@ def push():
     # Fetch base64 encoded files from GitHub REST API
     # Using the list of file paths in changed_files
     # Append each json object to  content_list_b64
+    print(changed_files)
     for path in changed_files:
         res = requests.get('https://api.github.com/repos/%s/%s/contents/%s' % (owner, repo, path),
                            auth=HTTPBasicAuth(username, PAT))
@@ -172,7 +181,7 @@ def push():
 
     ##### AUTH #####
 
-    body = {"projectId": 4918, "namespaceId": "39891", "texts": request_texts}
+    body = {"projectId": 4918, "taskId": "15120356", "texts": request_texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
@@ -204,7 +213,8 @@ def push():
     # ************* ADD SIGNING INFORMATION TO THE REQUEST *************
 
     authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
-    auth_headers = generate_auth_headers('POST',canonical_querystring,body,canonical_uri,secret_key,region,service,access_key,host)
+    auth_headers = generate_auth_headers('POST', canonical_querystring, body, canonical_uri, secret_key, region,
+                                         service, access_key, host)
     headers = {
         "content-type": 'application/json',
         'x-date': date,
@@ -225,17 +235,39 @@ def push():
 
     return '', 200
 
+@app.route("/hook", methods=['POST'])
+def hook():
+    response = request.get_json()
+    content_list_b64 = []
+    texts = []  #
+    request_texts = []  #
+    owner = response['repository']['owner']['login']
+    repo = response['repository']['name']
+    # Get a git connection as a Github App
+    config = {
+        "url": "http://example.com",
+        "content_type": "json"
+    }
+
+    git = Github(login_or_token=git_integration.get_access_token(git_integration.get_installation(owner, repo).id).token)
+    repo = git.get_repo(f"{owner}/{repo}").create_hook(name="web",events=['push'], active=True,config=config)
+    print(repo)
+
+
+    return '', 200
+
 @app.route("/test", methods=['POST', 'GET'])
 def test():
     q = 'Action=ProjectDetail&Version=2021-05-21'
-    b={"projectId":4918}
+    b = {"projectId": 4918}
 
-    auth = generate_auth_headers('GET',q,b,canonical_uri,secret_key,region,service,access_key,host)
+    auth = generate_auth_headers('GET', q, b, canonical_uri, secret_key, region, service, access_key, host)
     print(auth)
-    r = requests.get(endpoint+'?'+q,headers=auth,data=json.dumps(b).encode('utf-8').decode())
+    r = requests.get(endpoint + '?' + q, headers=auth, data=json.dumps(b).encode('utf-8').decode())
     print(r.content)
 
     return '', 200
+
 
 @app.route("/auth", methods=['POST', 'GET'])
 def auth():
@@ -286,12 +318,9 @@ def auth():
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
     print(r.status_code)
 
-
     print(r.text)
     print(r.request.body)
     return '', 200
-
-
 
 
 @app.route("/publish", methods=['POST', 'GET'])
