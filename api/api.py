@@ -11,14 +11,14 @@ from requests.auth import HTTPBasicAuth
 
 app = Flask(__name__)
 
-PAT = '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'
+PAT = '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'
 username = 'John-Oula'
 method = 'POST'
 service = 'i18n_openapi'
 host = "open.volcengineapi.com"
 region = 'cn-beijing'
 endpoint = "https://open.volcengineapi.com"
-request_parameters = 'Action=ProjectTaskSourceAdd&Version=2021-05-21'
+request_parameters = 'Action=ProjectNamespaceSourceAdd&Version=2021-05-21'
 content_type = 'application/json'
 
 access_key = "AKLTMDc3MGY5ZmI4NDI4NDRjZmE0ZjkyMDhjZDQ0YzI0Yzg"
@@ -172,7 +172,7 @@ def push():
 
     ##### AUTH #####
 
-    body = {"projectId": 4883, "taskId": "16932566", "texts": request_texts}
+    body = {"projectId": 4918, "namespaceId": "39891", "texts": request_texts}
     t = datetime.datetime.utcnow()
     date = t.strftime('%Y%m%dT%H%M%SZ')
     datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
@@ -204,7 +204,7 @@ def push():
     # ************* ADD SIGNING INFORMATION TO THE REQUEST *************
 
     authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
-
+    auth_headers = generate_auth_headers('POST',canonical_querystring,body,canonical_uri,secret_key,region,service,access_key,host)
     headers = {
         "content-type": 'application/json',
         'x-date': date,
@@ -214,18 +214,21 @@ def push():
     request_url = endpoint + '?' + canonical_querystring
 
     r = requests.post(request_url, headers=headers, data=json.dumps(body).encode('utf-8').decode())
+    print(headers)
+    re = requests.post(request_url, headers=auth_headers, data=json.dumps(body).encode('utf-8').decode())
+    print(auth_headers)
 
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
-    print(r.status_code)
-    print(r.text)
-    print(r.request.body)
+    print(re.status_code)
+    print(re.text)
+    print(re.request.body)
 
     return '', 200
 
 @app.route("/test", methods=['POST', 'GET'])
 def test():
     q = 'Action=ProjectDetail&Version=2021-05-21'
-    b={"projectId":4883}
+    b={"projectId":4918}
 
     auth = generate_auth_headers('GET',q,b,canonical_uri,secret_key,region,service,access_key,host)
     print(auth)
@@ -302,7 +305,7 @@ def publish():
     #
     # projectId = json_response["projectId"]
     args = request.args.to_dict()
-    projectId = 4883
+    projectId = 4918
     token_url = 'https://starling-public.zijieapi.com/v3/get_auth_token/%s/%s/%s/%s/' % (
         args['key'], OP_ID, projectId, NSPACE_ID)
 
