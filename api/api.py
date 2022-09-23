@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 import os
-
+from aws import  VolcAuth
 import requests
 from flask import Flask, request, url_for, redirect, jsonify
 from requests.auth import HTTPBasicAuth
@@ -30,7 +30,7 @@ algorithm = 'HMAC-SHA256'
 NSPACE_ID = '39880'
 OP_ID = 2100225925
 
-
+volc_auth = VolcAuth(access_key=access_key,secret_access_key=secret_key,region=region,service=service,host=host)
 def sign(key, msg):
     return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
 
@@ -42,6 +42,47 @@ def getSignatureKey(key, dateStamp, regionName, serviceName):
     kSigning = sign(kService, 'request')
     return kSigning
 
+def generate_auth_headers(method, canonical_querystring, body, canonical_uri, secret_key ,region, service ,access_key,host):
+
+
+    t = datetime.datetime.utcnow()
+    date = t.strftime('%Y%m%dT%H%M%SZ')
+    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
+
+
+
+
+
+    canonical_headers = 'host:' + host + '\n' + 'x-date:' + date + '\n'
+
+    signed_headers = 'host;x-date'
+
+    payload_hash = hashlib.sha256(json.dumps(body).encode('utf-8')).hexdigest()
+
+    canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
+
+    algorithm = 'HMAC-SHA256'
+    credential_scope = datestamp + '/' + region + '/' + service + '/' + 'request'
+    string_to_sign = algorithm + '\n' + date + '\n' + credential_scope + '\n' + hashlib.sha256(
+        canonical_request.encode('utf-8')).hexdigest()
+
+    # ************* TASK 3: CALCULATE THE SIGNATURE *************
+
+    signing_key = getSignatureKey(secret_key, datestamp, region, service)
+
+    # Sign the string_to_sign using the signing_key
+    signature = hmac.new(signing_key, (string_to_sign).encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST *************
+
+    authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
+
+    headers = {
+        "content-type": 'application/json',
+        'x-date': date,
+        'Authorization': authorization_header
+    }
+    return headers
 
 def date():
     # Create a date for headers and the credential string
@@ -71,7 +112,7 @@ def push():
     texts = []  #
     request_texts = []  #
 
-    # Get the commited file paths according to commit type
+    # Get the committed file paths according to commit type
 
     try:
         added_files = response['head_commit']['added']
@@ -103,6 +144,8 @@ def push():
                            auth=HTTPBasicAuth(username, PAT))
         content_list_b64.append(res.json())
 
+    # base64 decode "content" prop
+    # write the contents into the file
     for file in content_list_b64:
         file_content = base64.b64decode(file["content"])
         f = open(os.path.join(app.root_path, 'projects/repos/%s' % (repo), file['name']), 'w')
@@ -117,8 +160,8 @@ def push():
         to_dict = json.loads(file_to_string)
         texts.append(to_dict)
 
-        # Replace file's keys with "key" key
-        # Replace file's key's value with "content" key
+    # Replace file's keys with "key" key
+    # Replace file's key's value with "content" key
 
     for i, j in texts[0].items():
         new_obj = {}
@@ -151,14 +194,14 @@ def push():
     string_to_sign = algorithm + '\n' + date + '\n' + credential_scope + '\n' + hashlib.sha256(
         canonical_request.encode('utf-8')).hexdigest()
 
-    # ************* TASK 3: CALCULATE THE SIGNATURE *************
+    # ************* CALCULATE THE SIGNATURE *************
 
     signing_key = getSignatureKey(secret_key, datestamp, region, service)
 
     # Sign the string_to_sign using the signing_key
     signature = hmac.new(signing_key, (string_to_sign).encode('utf-8'), hashlib.sha256).hexdigest()
 
-    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST *************
+    # ************* ADD SIGNING INFORMATION TO THE REQUEST *************
 
     authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
 
@@ -179,6 +222,17 @@ def push():
 
     return '', 200
 
+@app.route("/test", methods=['POST', 'GET'])
+def test():
+    q = 'Action=ProjectDetail&Version=2021-05-21'
+    b={"projectId":4883}
+
+    auth = generate_auth_headers('GET',q,b,canonical_uri,secret_key,region,service,access_key,host)
+    print(auth)
+    r = requests.get(endpoint+'?'+q,headers=auth,data=json.dumps(b).encode('utf-8').decode())
+    print(r.content)
+
+    return '', 200
 
 @app.route("/auth", methods=['POST', 'GET'])
 def auth():
@@ -228,9 +282,13 @@ def auth():
 
     print('\nRESPONSE++++++++++++++++++++++++++++++++++++')
     print(r.status_code)
+
+
     print(r.text)
     print(r.request.body)
     return '', 200
+
+
 
 
 @app.route("/publish", methods=['POST', 'GET'])
